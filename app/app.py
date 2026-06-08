@@ -6,11 +6,9 @@ from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
 app = Flask(__name__)
 
-# --- Prometheus Counters ---
 REQUEST_COUNTER = Counter('app_requests_total', 'Total number of requests', ['method', 'path', 'status'])
 ERROR_COUNTER = Counter('app_errors_total', 'Total number of errors')
 
-# --- JSON Logger setup ---
 class JsonFormatter(logging.Formatter):
     def format(self, record):
         return json.dumps({
@@ -25,7 +23,6 @@ logger = logging.getLogger("app")
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
-# --- Middleware: log every request ---
 @app.after_request
 def log_request(response):
     logger.info(json.dumps({
@@ -39,7 +36,6 @@ def log_request(response):
     REQUEST_COUNTER.labels(method=request.method, path=request.path, status=response.status_code).inc()
     return response
 
-# --- Routes ---
 @app.route("/")
 def index():
     return {"message": "ok"}, 200

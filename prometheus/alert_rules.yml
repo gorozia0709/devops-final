@@ -2,7 +2,7 @@ groups:
   - name: app_alerts
     rules:
       - alert: HighErrorRate
-        expr: rate(app_errors_total[1m]) > 0.083
+        expr: rate(app_errors_total[1m]) * 60 > 5
         for: 0m
         labels:
           severity: critical
