@@ -1,0 +1,15 @@
+global:
+  resolve_timeout: 5m
+
+route:
+  receiver: webhook-fallback
+  group_by: ['alertname']
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 1h
+
+receivers:
+  - name: webhook-fallback
+    webhook_configs:
+      - url: http://app:5000/health
+        send_resolved: true

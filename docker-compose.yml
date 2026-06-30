@@ -19,6 +19,7 @@ services:
       driver: json-file
       options:
         tag: "{{.Name}}"
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
@@ -30,6 +31,18 @@ services:
       - ./prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml
     networks:
       - observability
+    restart: unless-stopped
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    container_name: alertmanager
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    networks:
+      - observability
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
@@ -37,7 +50,7 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD}
+      - GF_SECURITY_ADMIN_PASSWORD=${GF_SECURITY_ADMIN_PASSWORD:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
@@ -46,6 +59,7 @@ services:
     depends_on:
       - prometheus
       - loki
+    restart: unless-stopped
 
   loki:
     image: grafana/loki:2.9.0
@@ -58,6 +72,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     networks:
       - observability
+    restart: unless-stopped
 
   promtail:
     image: grafana/promtail:2.9.0
@@ -70,3 +85,4 @@ services:
       - observability
     depends_on:
       - loki
+    restart: unless-stopped
