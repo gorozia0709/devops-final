@@ -85,39 +85,42 @@ jobs:
 
   deploy:
     runs-on: ubuntu-latest
-    needs: test
+    needs: security
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Read current environment
-        id: env
-        run: |
-          CURRENT=$(cat ansible/active_slot.yml | grep active_slot | awk '{print $2}')
-          echo "current=$CURRENT" >> $GITHUB_OUTPUT
+      - name: Create .env from example
+        run: cp .env.example .env
 
-      - name: Decide next environment
-        id: next
-        run: |
-          if [ "${{ steps.env.outputs.current }}" = "blue" ]; then
-            echo "next=green" >> $GITHUB_OUTPUT
-          else
-            echo "next=blue" >> $GITHUB_OUTPUT
-          fi
+      - name: Build and start full stack
+        run: docker compose up -d --build
 
-      - name: Deploy to selected Render environment
+      - name: Wait for app to become healthy
         run: |
-          if [ "${{ steps.next.outputs.next }}" = "green" ]; then
-            curl ${{ secrets.RENDER_GREEN_DEPLOY_HOOK }}
-          else
-            curl ${{ secrets.RENDER_BLUE_DEPLOY_HOOK }}
-          fi
+          for i in {1..20}; do
+            if curl -sf http://localhost:5000/health > /dev/null; then
+              echo "App is healthy."
+              exit 0
+            fi
+            echo "Waiting for app... ($i/20)"
+            sleep 3
+          done
+          echo "App failed to become healthy in time."
+          docker compose logs app
+          exit 1
 
-      - name: Update active slot in repo
+      - name: Verify metrics endpoint
+        run: curl -sf http://localhost:5000/metrics > /dev/null
+
+      - name: Verify Prometheus target is up
         run: |
-          echo "active_slot: ${{ steps.next.outputs.next }}" > ansible/active_slot.yml
-          git config user.name "github-actions"
-          git config user.email "actions@github.com"
-          git add ansible/active_slot.yml
-          git commit -m "ci: update active slot to ${{ steps.next.outputs.next }}"
-          git push
+          sleep 5
+          curl -sf http://localhost:9090/-/ready > /dev/null
+
+      - name: Show running containers
+        run: docker compose ps
+
+      - name: Tear down stack
+        if: always()
+        run: docker compose down -v
