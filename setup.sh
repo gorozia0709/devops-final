@@ -46,7 +46,6 @@ else
 fi
 
 echo ""
-echo "=== Setup complete ==="
 echo "Flask app:  http://localhost:5000"
 echo "Prometheus: http://localhost:9090"
 echo "Grafana:    http://localhost:3000 (admin/admin)"
