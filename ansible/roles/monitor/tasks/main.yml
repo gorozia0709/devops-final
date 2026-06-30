@@ -6,6 +6,13 @@
     mode: '0755'
   become: yes
 
+- name: Create log directory
+  file:
+    path: /var/log/devops-app
+    state: directory
+    mode: '0755'
+  become: yes
+
 - name: Schedule health check every 5 minutes via cron
   cron:
     name: devops health check

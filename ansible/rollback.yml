@@ -15,11 +15,17 @@
       debug:
         msg: "Rolling back from {{ current_slot }} to {{ previous_slot }} (port {{ previous_port }})"
 
-    - name: Start previous slot
-      systemd:
-        name: "devops-app-{{ previous_slot }}"
-        state: started
-      become: yes
+    - name: Build previous slot image
+      command: docker build -t app:{{ previous_slot }} ./app
+      args:
+        chdir: "{{ playbook_dir }}/.."
+
+    - name: Start previous slot container
+      command: >
+        docker run -d --rm
+        --name app-{{ previous_slot }}
+        -p {{ previous_port }}:5000
+        app:{{ previous_slot }}
 
     - name: Wait for previous slot to be healthy
       uri:
@@ -35,11 +41,8 @@
         content: "active_slot: {{ previous_slot }}\n"
         dest: "{{ playbook_dir }}/active_slot.yml"
 
-    - name: Stop current broken slot
-      systemd:
-        name: "devops-app-{{ current_slot }}"
-        state: stopped
-      become: yes
+    - name: Stop broken slot container
+      command: docker stop app-{{ current_slot }}
       ignore_errors: yes
 
     - name: Show result
