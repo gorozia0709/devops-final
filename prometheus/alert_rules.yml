@@ -9,3 +9,12 @@ groups:
         annotations:
           summary: "CRITICAL: High error rate detected"
           description: "Error rate has exceeded 5 errors per minute"
+
+      - alert: AppDown
+        expr: up{job="flask-app"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "CRITICAL: Flask app is down"
+          description: "The flask-app target has been unreachable for more than 1 minute"

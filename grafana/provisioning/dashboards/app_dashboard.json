@@ -42,6 +42,19 @@
           "legendFormat": "errors/min"
         }
       ]
+    },
+    {
+      "type": "stat",
+      "title": "App Availability",
+      "id": 4,
+      "gridPos": { "x": 6, "y": 8, "w": 6, "h": 4 },
+      "targets": [
+        {
+          "datasource": "Prometheus",
+          "expr": "up{job=\"flask-app\"}",
+          "legendFormat": "up"
+        }
+      ]
     }
   ],
   "time": { "from": "now-15m", "to": "now" },

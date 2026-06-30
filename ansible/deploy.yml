@@ -51,27 +51,56 @@
         enabled: yes
       become: yes
 
-    - name: Wait for target slot to be healthy
-      uri:
-        url: "http://localhost:{{ app_port }}/health"
-        status_code: 200
-      register: health
-      retries: 5
-      delay: 3
-      until: health.status == 200
+    - name: Verify and switch
+      block:
+        - name: Wait for target slot to be healthy
+          uri:
+            url: "http://localhost:{{ app_port }}/health"
+            status_code: 200
+          register: health
+          retries: 5
+          delay: 3
+          until: health.status == 200
 
-    - name: Switch active slot
-      copy:
-        content: "active_slot: {{ target_slot }}\n"
-        dest: "{{ playbook_dir }}/active_slot.yml"
+        - name: Switch active slot
+          copy:
+            content: "active_slot: {{ target_slot }}\n"
+            dest: "{{ playbook_dir }}/active_slot.yml"
 
-    - name: Stop old slot
-      systemd:
-        name: "devops-app-{{ old_slot }}"
-        state: stopped
-      become: yes
-      ignore_errors: yes
+        - name: Stop old slot
+          systemd:
+            name: "devops-app-{{ old_slot }}"
+            state: stopped
+          become: yes
+          ignore_errors: yes
 
-    - name: Show result
-      debug:
-        msg: "Switch complete. Active slot is now {{ target_slot }} on port {{ app_port }}"
+        - name: Show result
+          debug:
+            msg: "Switch complete. Active slot is now {{ target_slot }} on port {{ app_port }}"
+
+      rescue:
+        - name: Auto-rollback triggered
+          debug:
+            msg: "Health check failed. Rolling back to {{ old_slot }}"
+
+        - name: Stop failed target slot
+          systemd:
+            name: "devops-app-{{ target_slot }}"
+            state: stopped
+          become: yes
+          ignore_errors: yes
+
+        - name: Ensure old slot is still running
+          systemd:
+            name: "devops-app-{{ old_slot }}"
+            state: started
+          become: yes
+
+        - name: Revert active slot file
+          copy:
+            content: "active_slot: {{ old_slot }}\n"
+            dest: "{{ playbook_dir }}/active_slot.yml"
+
+        - name: Fail with rollback message
+          fail:
+            msg: "Deployment failed. Rolled back to {{ old_slot }}"
