@@ -1,0 +1,47 @@
+---
+- name: Rollback to previous slot
+  hosts: local
+  vars_files:
+    - active_slot.yml
+
+  tasks:
+    - name: Determine previous slot
+      set_fact:
+        previous_slot: "{{ 'green' if active_slot == 'blue' else 'blue' }}"
+        previous_port: "{{ 5001 if active_slot == 'blue' else 5000 }}"
+        current_slot: "{{ active_slot }}"
+
+    - name: Show rollback info
+      debug:
+        msg: "Rolling back from {{ current_slot }} to {{ previous_slot }} (port {{ previous_port }})"
+
+    - name: Start previous slot
+      systemd:
+        name: "devops-app-{{ previous_slot }}"
+        state: started
+      become: yes
+
+    - name: Wait for previous slot to be healthy
+      uri:
+        url: "http://localhost:{{ previous_port }}/health"
+        status_code: 200
+      register: health
+      retries: 5
+      delay: 3
+      until: health.status == 200
+
+    - name: Switch active slot back
+      copy:
+        content: "active_slot: {{ previous_slot }}\n"
+        dest: "{{ playbook_dir }}/active_slot.yml"
+
+    - name: Stop current broken slot
+      systemd:
+        name: "devops-app-{{ current_slot }}"
+        state: stopped
+      become: yes
+      ignore_errors: yes
+
+    - name: Show result
+      debug:
+        msg: "Rollback complete. Active slot is now {{ previous_slot }} on port {{ previous_port }}"

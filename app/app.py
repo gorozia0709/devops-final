@@ -1,10 +1,14 @@
 import time
 import logging
 import json
-from flask import Flask, request
+import os
+from flask import Flask, request, render_template
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
 app = Flask(__name__)
+
+SLOT = os.environ.get("SLOT", "unknown")
+PORT = int(os.environ.get("PORT", 5000))
 
 REQUEST_COUNTER = Counter('app_requests_total', 'Total number of requests', ['method', 'path', 'status'])
 ERROR_COUNTER = Counter('app_errors_total', 'Total number of errors')
@@ -38,16 +42,20 @@ def log_request(response):
 
 @app.route("/")
 def index():
-    return {"message": "ok"}, 200
+    return {"message": "ok", "slot": SLOT}, 200
 
 @app.route("/error")
 def error():
     ERROR_COUNTER.inc()
     return {"message": "forced error"}, 500
 
+@app.route("/health")
+def health():
+    return {"status": "ok", "slot": SLOT}, 200
+
 @app.route("/metrics")
 def metrics():
     return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=PORT)

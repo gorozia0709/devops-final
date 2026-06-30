@@ -1,0 +1,34 @@
+---
+- name: Install pip
+  apt:
+    name: python3-pip
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Create app directory
+  file:
+    path: /opt/devops-app
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Create log directory
+  file:
+    path: /var/log/devops-app
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Copy requirements.txt
+  copy:
+    src: "{{ playbook_dir }}/../requirements.txt"
+    dest: /opt/devops-app/requirements.txt
+    mode: '0644'
+  become: yes
+
+- name: Install Python dependencies
+  pip:
+    requirements: /opt/devops-app/requirements.txt
+    executable: pip3
+  become: yes

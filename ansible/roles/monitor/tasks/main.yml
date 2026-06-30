@@ -1,0 +1,15 @@
+---
+- name: Copy health check script
+  copy:
+    src: health_check.py
+    dest: /opt/devops-app/health_check.py
+    mode: '0755'
+  become: yes
+
+- name: Schedule health check every 5 minutes via cron
+  cron:
+    name: devops health check
+    minute: "*/5"
+    job: "/usr/bin/python3 /opt/devops-app/health_check.py >> /var/log/devops-app/health.log 2>&1"
+    user: root
+  become: yes

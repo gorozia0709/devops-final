@@ -1,0 +1,77 @@
+---
+- name: Blue-Green Deployment
+  hosts: local
+  vars_files:
+    - active_slot.yml
+
+  tasks:
+    - name: Determine target slot
+      set_fact:
+        target_slot: "{{ 'green' if active_slot == 'blue' else 'blue' }}"
+        app_port: "{{ 5001 if active_slot == 'blue' else 5000 }}"
+        old_slot: "{{ active_slot }}"
+
+    - name: Show deployment info
+      debug:
+        msg: "Deploying to {{ target_slot }} (port {{ app_port }}), current active is {{ old_slot }}"
+
+    - name: Create target slot directory
+      file:
+        path: "/opt/devops-app/{{ target_slot }}"
+        state: directory
+        mode: '0755'
+      become: yes
+
+    - name: Copy app files to target slot
+      copy:
+        src: "{{ playbook_dir }}/../app/"
+        dest: "/opt/devops-app/{{ target_slot }}/"
+        mode: '0755'
+      become: yes
+
+    - name: Write systemd service for target slot
+      template:
+        src: "{{ playbook_dir }}/../ansible/templates/app.service.j2"
+        dest: "/etc/systemd/system/devops-app-{{ target_slot }}.service"
+        mode: '0644'
+      vars:
+        slot: "{{ target_slot }}"
+        app_port: "{{ app_port }}"
+      become: yes
+
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+      become: yes
+
+    - name: Start target slot
+      systemd:
+        name: "devops-app-{{ target_slot }}"
+        state: restarted
+        enabled: yes
+      become: yes
+
+    - name: Wait for target slot to be healthy
+      uri:
+        url: "http://localhost:{{ app_port }}/health"
+        status_code: 200
+      register: health
+      retries: 5
+      delay: 3
+      until: health.status == 200
+
+    - name: Switch active slot
+      copy:
+        content: "active_slot: {{ target_slot }}\n"
+        dest: "{{ playbook_dir }}/active_slot.yml"
+
+    - name: Stop old slot
+      systemd:
+        name: "devops-app-{{ old_slot }}"
+        state: stopped
+      become: yes
+      ignore_errors: yes
+
+    - name: Show result
+      debug:
+        msg: "Switch complete. Active slot is now {{ target_slot }} on port {{ app_port }}"
