@@ -21,6 +21,7 @@ class JsonFormatter(logging.Formatter):
             "message": record.getMessage()
         })
 
+
 handler = logging.StreamHandler()
 handler.setFormatter(JsonFormatter())
 logger = logging.getLogger("app")
@@ -40,14 +41,17 @@ def log_request(response):
     REQUEST_COUNTER.labels(method=request.method, path=request.path, status=response.status_code).inc()
     return response
 
+
 @app.route("/")
 def index():
     return {"message": "ok", "slot": SLOT}, 200
+
 
 @app.route("/error")
 def error():
     ERROR_COUNTER.inc()
     return {"message": "forced error"}, 500
+
 
 @app.route("/health")
 def health():
@@ -56,6 +60,7 @@ def health():
 @app.route("/metrics")
 def metrics():
     return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=PORT)
