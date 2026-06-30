@@ -78,6 +78,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Run Checkov IaC scan
+        run: |
+          pip install checkov
+          checkov -f docker-compose.yml --quiet
+
   deploy:
     runs-on: ubuntu-latest
     needs: test
