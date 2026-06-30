@@ -1,0 +1,39 @@
+---
+- name: Copy app files to target slot
+  copy:
+    src: "{{ playbook_dir }}/../app/"
+    dest: "/opt/devops-app/{{ slot }}/"
+    mode: '0755'
+  become: yes
+
+- name: Copy requirements.txt
+  copy:
+    src: "{{ playbook_dir }}/../requirements.txt"
+    dest: /opt/devops-app/requirements.txt
+    mode: '0644'
+  become: yes
+
+- name: Install dependencies
+  pip:
+    requirements: /opt/devops-app/requirements.txt
+    executable: pip3
+  become: yes
+
+- name: Write systemd service for slot
+  template:
+    src: "{{ playbook_dir }}/../ansible/templates/app.service.j2"
+    dest: "/etc/systemd/system/devops-app-{{ slot }}.service"
+    mode: '0644'
+  become: yes
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: yes
+  become: yes
+
+- name: Start and enable slot service
+  systemd:
+    name: "devops-app-{{ slot }}"
+    state: restarted
+    enabled: yes
+  become: yes

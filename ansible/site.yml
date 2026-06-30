@@ -1,0 +1,6 @@
+---
+- name: Provision local environment
+  hosts: local
+  roles:
+    - setup
+    - monitor

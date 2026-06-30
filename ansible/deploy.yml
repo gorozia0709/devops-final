@@ -1,0 +1,70 @@
+---
+- name: Docker Blue-Green Deployment
+  hosts: local
+  vars_files:
+    - active_slot.yml
+
+  tasks:
+    - name: Determine target slot
+      set_fact:
+        target_slot: "{{ 'green' if active_slot == 'blue' else 'blue' }}"
+        target_port: "{{ 5001 if active_slot == 'blue' else 5000 }}"
+        old_slot: "{{ active_slot }}"
+
+    - name: Show deployment info
+      debug:
+        msg: "Deploying to {{ target_slot }} (port {{ target_port }}), current active is {{ old_slot }}"
+
+    - name: Build latest Docker image
+      command: docker build -t app:{{ target_slot }} ./app
+      args:
+        chdir: "{{ playbook_dir }}/.."
+
+    - name: Verify and switch
+      block:
+        - name: Start target slot container
+          command: >
+            docker run -d --rm
+            --name app-{{ target_slot }}
+            -p {{ target_port }}:5000
+            app:{{ target_slot }}
+
+        - name: Wait for target slot to be healthy
+          uri:
+            url: "http://localhost:{{ target_port }}/health"
+            status_code: 200
+          register: health
+          retries: 5
+          delay: 3
+          until: health.status == 200
+
+        - name: Switch active slot
+          copy:
+            content: "active_slot: {{ target_slot }}\n"
+            dest: "{{ playbook_dir }}/active_slot.yml"
+
+        - name: Stop old slot container
+          command: docker stop app-{{ old_slot }}
+          ignore_errors: yes
+
+        - name: Show result
+          debug:
+            msg: "Switch complete. Active slot is now {{ target_slot }} on port {{ target_port }}"
+
+      rescue:
+        - name: Auto-rollback triggered
+          debug:
+            msg: "Health check failed. Rolling back to {{ old_slot }}"
+
+        - name: Stop failed target slot container
+          command: docker stop app-{{ target_slot }}
+          ignore_errors: yes
+
+        - name: Revert active slot file
+          copy:
+            content: "active_slot: {{ old_slot }}\n"
+            dest: "{{ playbook_dir }}/active_slot.yml"
+
+        - name: Fail with rollback message
+          fail:
+            msg: "Deployment failed. Rolled back to {{ old_slot }}"
