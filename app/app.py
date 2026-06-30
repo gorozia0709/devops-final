@@ -2,7 +2,7 @@ import time
 import logging
 import json
 import os
-from flask import Flask, request, render_template
+from flask import Flask, request
 from prometheus_client import Counter, generate_latest, CONTENT_TYPE_LATEST
 
 app = Flask(__name__)
@@ -10,8 +10,14 @@ app = Flask(__name__)
 SLOT = os.environ.get("SLOT", "unknown")
 PORT = int(os.environ.get("PORT", 5000))
 
-REQUEST_COUNTER = Counter('app_requests_total', 'Total number of requests', ['method', 'path', 'status'])
+REQUEST_COUNTER = Counter(
+    'app_requests_total',
+    'Total number of requests',
+    ['method', 'path', 'status']
+)
+
 ERROR_COUNTER = Counter('app_errors_total', 'Total number of errors')
+
 
 class JsonFormatter(logging.Formatter):
     def format(self, record):
@@ -24,21 +30,31 @@ class JsonFormatter(logging.Formatter):
 
 handler = logging.StreamHandler()
 handler.setFormatter(JsonFormatter())
+
 logger = logging.getLogger("app")
 logger.setLevel(logging.INFO)
 logger.addHandler(handler)
 
+
 @app.after_request
 def log_request(response):
-    logger.info(json.dumps({
+    log_data = {
         "timestamp": time.strftime("%Y-%m-%dT%H:%M:%S"),
         "level": "INFO",
         "method": request.method,
         "path": request.path,
         "status": response.status_code,
         "duration_ms": 0
-    }))
-    REQUEST_COUNTER.labels(method=request.method, path=request.path, status=response.status_code).inc()
+    }
+
+    logger.info(json.dumps(log_data))
+
+    REQUEST_COUNTER.labels(
+        method=request.method,
+        path=request.path,
+        status=response.status_code
+    ).inc()
+
     return response
 
 
@@ -57,9 +73,12 @@ def error():
 def health():
     return {"status": "ok", "slot": SLOT}, 200
 
+
 @app.route("/metrics")
 def metrics():
-    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
+    return generate_latest(), 200, {
+        "Content-Type": CONTENT_TYPE_LATEST
+    }
 
 
 if __name__ == "__main__":
