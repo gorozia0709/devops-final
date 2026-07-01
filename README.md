@@ -365,7 +365,7 @@ restart automatically.
 
 ### Rollback Procedure
 
-See `docs/RUNBOOK.md` for full incident response steps.
+See `docs/INCIDENT_RESPONSE.md` for full incident response steps.
 
 Quick reference:
 
